@@ -213,7 +213,7 @@ PUT http://127.0.0.1:8000/api/productos/1
   "activo": true
 }
 
-🧪 Pruebas automatizadas (Pest / PHPUnit)
+Pruebas automatizadas (Pest / PHPUnit)
 
 Archivo: .env.testing
 
@@ -228,3 +228,139 @@ DB_FOREIGN_KEYS=true
 Ejecutar:
 
 php artisan serve
+Testing con Pest / PHPUnit
+
+En esta práctica se implementaron pruebas unitarias y pruebas de integración para validar el correcto funcionamiento del back-end desarrollado en Laravel.
+Las pruebas garantizan la calidad del código, la integridad de los datos y el cumplimiento de las reglas de validación en cada endpoint.
+
+Configuración del entorno de pruebas
+
+Para mantener separadas las pruebas del entorno principal, se creó un archivo .env.test con una base de datos PostgreSQL exclusiva:
+
+APP_ENV=test
+APP_KEY=base64:u8oeKgBHTVUU+vlbM3aYN8ek0M0pYw84PDY5p/0aedA=
+APP_DEBUG=true
+APP_URL=http://127.0.0.1:8000
+
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=practica_alayn_appweb_test
+DB_USERNAME=practicas
+DB_PASSWORD=12345
+
+
+Antes de ejecutar las pruebas, se debe crear la base de datos de test:
+
+CREATE DATABASE practica_alayn_appweb_test OWNER practicas;
+
+
+Luego ejecutar:
+
+php artisan migrate:fresh --env=test
+
+
+Esto genera las tablas necesarias exclusivamente para el entorno de pruebas.
+
+Archivos de prueba principales
+tests/Unit/CategoriaModeTest.php
+
+Este archivo contiene pruebas unitarias, enfocadas en verificar el funcionamiento interno del modelo Categoria.
+
+uses(Tests\TestCase::class, Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+it('usa la tabla categorias y puede crearse con nombre/descripcion/activa', function () {
+    $cat = \App\Models\Categoria::create([
+        'nombre' => 'Hogar y Cocina',
+        'descripcion' => 'Artículos del hogar',
+        'activa' => true,
+    ]);
+
+    expect($cat->id)->toBeInt();
+    expect($cat->nombre)->toBe('Hogar y Cocina');
+});
+
+it('expone la relación productos como hasMany con fk categoria_id', function () {
+    $rel = (new \App\Models\Categoria())->productos();
+    expect($rel->getForeignKeyName())->toBe('categoria_id');
+});
+
+
+Explicación técnica:
+
+Se prueba la capacidad del modelo para crear registros y asignar valores correctamente.
+
+Se comprueba que la relación hasMany con Producto esté bien definida y que use la clave foránea correcta (categoria_id).
+
+El uso de RefreshDatabase reinicia la base de datos antes de cada prueba, asegurando resultados limpios y consistentes.
+
+tests/Feature/ProductoApiTest.php
+
+Este archivo incluye pruebas de integración (o Feature Tests) que simulan llamadas reales a la API.
+
+Se validan los endpoints principales:
+
+Endpoint	Método	Descripción	Código esperado
+/api/todos-los-productos	GET	Lista productos paginados	200
+/api/guardar-producto	POST	Crea un nuevo producto	201
+/api/productos/{id}	GET	Muestra un producto específico	200
+/api/productos/{id}	PUT	Actualiza un producto existente	200
+/api/productos/{id}	DELETE	Elimina un producto	204
+
+Ejemplo simplificado:
+
+it('crea un producto (201) y lo persiste', function () {
+    $categoria = \App\Models\Categoria::factory()->create();
+
+    $payload = [
+        'categoria_id' => $categoria->id,
+        'nombre' => 'Producto Nuevo',
+        'sku' => 'SKU-ABC01',
+        'stock' => 10,
+        'precio' => 25.50,
+        'activo' => true,
+    ];
+
+    $res = $this->postJson('/api/guardar-producto', $payload);
+
+    $res->assertStatus(201)
+        ->assertJsonFragment([
+            'nombre' => 'Producto Nuevo',
+            'sku' => 'SKU-ABC01'
+        ]);
+
+    $this->assertDatabaseHas('productos', ['sku' => 'SKU-ABC01']);
+});
+
+
+ Qué valida:
+
+Que el endpoint responda con el código correcto (201 Created).
+
+Que los datos se guarden realmente en la base de datos.
+
+Que el formato JSON de la respuesta sea válido.
+
+También se incluyen pruebas para:
+
+Validación de errores (422) → cuando se envían datos incorrectos.
+
+Lectura y eliminación → garantizando que el sistema devuelva los códigos 200 OK y 204 No Content respectivamente.
+
+ Resumen técnico de las pruebas
+Tipo de prueba	Archivo	Objetivo	Base de datos	Ejemplo de éxito
+Unitaria	CategoriaModeTest	Validar estructura del modelo y relaciones	En memoria (refrescada)	Creación de categoría y relación con productos
+Integración	ProductoApiTest	Probar endpoints CRUD reales	PostgreSQL (.env.test)	Creación, listado y eliminación de productos
+▶Ejecución de pruebas
+
+Para correr todas las pruebas del proyecto:
+
+php artisan config:clear
+php artisan migrate:fresh --env=test
+php artisan test --env=test
+
+
+Si todo está correcto, deberías ver una salida como esta:
+
+PASS  Tests\Unit\CategoriaModeTest
+PASS  Tests\Feature\ProductoApiTest
